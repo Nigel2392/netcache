@@ -126,5 +126,4 @@ func TestCacheServer(t *testing.T) {
 	}
 
 	cacheClient.Close()
-
 }
