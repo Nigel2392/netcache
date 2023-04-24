@@ -11,7 +11,6 @@ import (
 	"github.com/Nigel2392/netcache/src/cache"
 	"github.com/Nigel2392/netcache/src/client"
 	"github.com/Nigel2392/netcache/src/logger"
-	"github.com/Nigel2392/netcache/src/protocols"
 	"github.com/Nigel2392/netcache/src/server"
 )
 
@@ -32,8 +31,6 @@ var flags struct {
 	memcache bool
 	// Use the built-in cli
 	cli bool
-	// The cli-serializer to use.
-	cliSerializer string
 }
 
 func init() {
@@ -45,7 +42,6 @@ func init() {
 	flag.StringVar(&flags.loglevel, "loglevel", "INFO", "The log level to use. (\"CRITICAL\", \"ERROR\", \"WARNING\", \"INFO\", \"DEBUG\", \"TEST\")")
 	flag.BoolVar(&flags.memcache, "memory", false, "Use an in-memory cache.")
 	flag.BoolVar(&flags.cli, "cli", false, "Use the built-in cli.")
-	flag.StringVar(&flags.cliSerializer, "cli-serializer", "", "The cli-serializer to use. (\"json\", \"gob\", \"xml\", \"\")")
 	flag.Parse()
 }
 
@@ -81,7 +77,7 @@ func main() {
 }
 
 func startCLI() {
-	var client = client.New(fmt.Sprintf("%s:%d", flags.address, flags.port), getSerializer())
+	var client = client.New(fmt.Sprintf("%s:%d", flags.address, flags.port), nil)
 	var err = client.Connect()
 	if err != nil {
 		panic(err)
@@ -98,6 +94,7 @@ func startCLI() {
 		}
 		switch strings.ToLower(cmd) {
 		case "quit", "exit", "q", "leave":
+			fmt.Printf("%s%s%s\n", logger.Green, "GOODBYE...", logger.Reset)
 			return
 		case "get":
 			var key string
@@ -192,16 +189,4 @@ func printHelp() {
 	fmt.Printf("\t%skeys%s\n", logger.Green, logger.Reset)
 	fmt.Printf("\t%shelp%s\n", logger.Green, logger.Reset)
 	fmt.Printf("\t%squit%s\n", logger.Green, logger.Reset)
-}
-
-func getSerializer() protocols.Serializer {
-	switch strings.ToLower(flags.cliSerializer) {
-	case "json":
-		return &protocols.JsonSerializer{}
-	case "gob":
-		return &protocols.GobSerializer{}
-	case "xml":
-		return &protocols.XmlSerializer{}
-	}
-	return nil
 }
