@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Nigel2392/netcache/src/client"
-	"github.com/Nigel2392/netcache/src/internal/protocols"
 	"github.com/Nigel2392/netcache/src/logger"
+	"github.com/Nigel2392/netcache/src/protocols"
 	"github.com/Nigel2392/netcache/src/server"
 )
 

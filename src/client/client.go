@@ -1,13 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/Nigel2392/netcache/src/cache"
-	"github.com/Nigel2392/netcache/src/internal/protocols"
+	"github.com/Nigel2392/netcache/src/protocols"
 )
 
 func init() {
@@ -78,20 +79,28 @@ func (c *CacheClient) Close() error {
 //
 // Destination is only used if a serializer has been set.
 func (c *CacheClient) Get(key string, dst any) (Item, error) {
+	if err := cache.IsValidKey(key); err != nil {
+		return nil, err
+	}
+
 	var message = &protocols.Message{
 		Type: protocols.TypeGET,
 		Key:  key,
 	}
 
+	fmt.Println("sending message")
 	_, err := message.WriteTo(c.conn)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("reading message")
 	_, err = message.ReadFrom(c.conn)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("got message", message)
 
 	if message.Type == protocols.TypeERROR {
 		return nil, fmt.Errorf("error from server: %s", message.Value)
@@ -127,6 +136,10 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 //
 // Otherwise, the value must be a []byte or string.
 func (c *CacheClient) Set(key string, value any, ttl int64) error {
+	if err := cache.IsValidKey(key); err != nil {
+		return err
+	}
+
 	var v []byte
 	var err error
 	if c.Serializer == nil {
@@ -164,6 +177,10 @@ func (c *CacheClient) Set(key string, value any, ttl int64) error {
 
 // Delete an item from the cache.
 func (c *CacheClient) Delete(key string) error {
+	if err := cache.IsValidKey(key); err != nil {
+		return err
+	}
+
 	var message = &protocols.Message{
 		Type: protocols.TypeDELETE,
 		Key:  key,
@@ -193,6 +210,10 @@ func (c *CacheClient) Clear() error {
 
 // Check if the cache has an item.
 func (c *CacheClient) Has(key string) (bool, error) {
+	if err := cache.IsValidKey(key); err != nil {
+		return false, err
+	}
+
 	var message = &protocols.Message{
 		Type: protocols.TypeHAS,
 		Key:  key,
@@ -251,12 +272,12 @@ func (c *CacheClient) Keys() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	message.Value = bytes.Trim(message.Value, ",")
 	var keys []string = strings.Split(string(message.Value), ",")
 	for i, key := range keys {
 		key = strings.TrimSpace(key)
 		if err := cache.IsValidKey(key); err != nil {
-			return nil, err
+
 		}
 		keys[i] = key
 	}

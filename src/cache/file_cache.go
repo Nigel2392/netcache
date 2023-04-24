@@ -62,6 +62,8 @@ func NewFileCache(dir string) Cache {
 
 // Run the cache.
 func (c *FileCache) Run(interval time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.queue = make(chan *queueItem, 100)
 	c.closed = make(chan struct{})
 	c.cleanupInterval = interval
@@ -204,8 +206,11 @@ func (c *FileCache) Has(key string) (ttl time.Duration, has bool) {
 }
 
 func (c *FileCache) delete(item *item) (err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	var locked bool = c.mu.TryLock()
+	if locked {
+		defer c.mu.Unlock()
+	}
+
 	var _, found = c.cache.Search(item)
 	if !found {
 		c.mu.Unlock()

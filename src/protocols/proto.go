@@ -58,7 +58,9 @@ func WriteEnd(w io.Writer) error {
 
 func (m Message) WriteTo(w io.Writer) (n int64, err error) {
 	var b = new(bytes.Buffer)
-
+	if w == nil {
+		return 0, io.ErrClosedPipe
+	}
 	err = binary.Write(b, binary.LittleEndian, m.Type)
 	if err != nil {
 		return 0, err
@@ -83,7 +85,6 @@ func (m Message) WriteTo(w io.Writer) (n int64, err error) {
 	if err != nil {
 		return 0, err
 	}
-
 	err = binary.Write(w, binary.LittleEndian, int64(b.Len()))
 	if err != nil {
 		return 0, err

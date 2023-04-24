@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nigel2392/netcache/src/internal/protocols"
+	"github.com/Nigel2392/netcache/src/protocols"
 )
 
 func TestProtocol(t *testing.T) {
 	var message = &protocols.Message{
 		Type:  protocols.TypeGET,
-		Key:   "key",
-		Value: []byte("value"),
+		Key:   "kgsjhdfsghjgfdey",
+		Value: []byte("vallkfkngkjsdfbgvsdfgvaue"),
 		TTL:   5 * time.Second,
 	}
 
@@ -47,4 +47,8 @@ func TestProtocol(t *testing.T) {
 	if message.TTL != message2.TTL {
 		t.Fatalf("ttl mismatch %d != %d", message.TTL, message2.TTL)
 	}
+
+	t.Log(message2.Key)
+	t.Log(string(message2.Value))
+	t.Log(message2.TTL)
 }

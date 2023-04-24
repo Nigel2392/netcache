@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Nigel2392/netcache/src/cache"
-	"github.com/Nigel2392/netcache/src/internal/protocols"
 	"github.com/Nigel2392/netcache/src/logger"
+	"github.com/Nigel2392/netcache/src/protocols"
 )
 
 type CacheServer struct {
@@ -138,6 +138,7 @@ func (s *CacheServer) handle(c net.Conn) {
 				}
 				return nil
 			}
+			s.logger.Debug("Writing end message...")
 			err = protocols.WriteEnd(c)
 			if err != nil {
 				if s.logger != nil {
