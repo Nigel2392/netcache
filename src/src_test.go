@@ -40,7 +40,7 @@ func TestCacheServer(t *testing.T) {
 	}
 
 	for key, item := range items {
-		err = cacheClient.Set(key, item, int64(5*time.Second))
+		err = cacheClient.Set(key, item, 5*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		} else {
@@ -79,7 +79,7 @@ func TestCacheServer(t *testing.T) {
 	}
 
 	for key, item := range items {
-		err = cacheClient.Set(key, item, int64(5*time.Second))
+		err = cacheClient.Set(key, item, 5*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		} else {

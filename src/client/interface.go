@@ -1,11 +1,13 @@
 package client
 
+import "time"
+
 // A item to be used inside of a cache.
 type Item interface {
 	// Get the value of the item.
 	Value() interface{}
 	// Get the expiration time of the item.
-	TTL() int64
+	TTL() time.Duration
 }
 
 // A cache to store items in.
@@ -15,7 +17,7 @@ type Cache interface {
 	// Get an item from the cache.
 	Get(key string, dst any) (Item, error)
 	// Set an item in the cache.
-	Set(key string, value any, ttl int64) error
+	Set(key string, value any, ttl time.Duration) error
 	// Delete an item from the cache.
 	Delete(key string) error
 	// Clear the cache.

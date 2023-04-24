@@ -136,7 +136,7 @@ func startCLI() {
 				fmt.Println(err)
 				continue
 			}
-			err = client.Set(key, value, int64(time.Duration(ttl)*time.Second))
+			err = client.Set(key, value, time.Duration(ttl)*time.Second)
 			if err != nil {
 				fmt.Println(err)
 				continue

@@ -21,7 +21,7 @@ type cacheItem struct {
 	value interface{}
 
 	// The expiration time of the item.
-	ttl int64
+	ttl time.Duration
 }
 
 // Get the value of the item.
@@ -30,7 +30,7 @@ func (i *cacheItem) Value() interface{} {
 }
 
 // Get the expiration time of the item.
-func (i *cacheItem) TTL() int64 {
+func (i *cacheItem) TTL() time.Duration {
 	return i.ttl
 }
 
@@ -126,7 +126,7 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 
 	return &cacheItem{
 		value: v,
-		ttl:   int64(message.TTL),
+		ttl:   message.TTL,
 	}, nil
 }
 
@@ -135,7 +135,7 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 // If a serializer has been set, the value will be serialized.
 //
 // Otherwise, the value must be a []byte or string.
-func (c *CacheClient) Set(key string, value any, ttl int64) error {
+func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 	if err := cache.IsValidKey(key); err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (c *CacheClient) Set(key string, value any, ttl int64) error {
 		Type:  protocols.TypeSET,
 		Key:   key,
 		Value: v,
-		TTL:   time.Duration(ttl),
+		TTL:   ttl,
 	}
 
 	_, err = message.WriteTo(c.conn)
