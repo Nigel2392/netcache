@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	setup()
 
 	if flags.cli {
 		startCLI()
@@ -35,13 +36,28 @@ func main() {
 	} else {
 		std = os.Stdout
 	}
+	var logger = logger.Newlogger(logger.LoglevelFromString(flags.loglevel), std)
 	server.NewLogger(
-		logger.Newlogger(logger.LoglevelFromString(flags.loglevel), std),
+		logger,
 	)
+
+	dumpFlags(logger)
+
 	err = server.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}
+}
+
+func dumpFlags(logger logger.Logger) {
+	logger.Info("Flags:")
+	logger.Infof("  Address: %s\n", flags.address)
+	logger.Infof("  Port: %d\n", flags.port)
+	logger.Infof("  CacheDir: %s\n", flags.cacheDir)
+	logger.Infof("  Timeout: %d\n", flags.timeout)
+	logger.Infof("  LogLevel: %s\n", flags.loglevel)
+	logger.Infof("  LogFile: %s\n", flags.logfile)
+	logger.Infof("  Memcache: %t\n\n", flags.memcache)
 }
 
 func startCLI() {

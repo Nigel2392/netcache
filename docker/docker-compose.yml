@@ -12,7 +12,7 @@ services:
       LOGLEVEL: DEBUG
       MEMCACHE: false
     ports:
-    - "2392:2392"
+      - "2392:2392"
     volumes:
       - cache_data:/netcache/cache
       - ./log:/netcache/log

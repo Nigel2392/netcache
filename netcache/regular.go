@@ -24,9 +24,9 @@ var flags struct {
 	cli bool
 }
 
-func init() {
+func setup() {
 	flag.StringVar(&flags.address, "address", "127.0.0.1", "The address to listen on.")
-	flag.IntVar(&flags.port, "port", 8080, "The port to listen on.")
+	flag.IntVar(&flags.port, "port", 2392, "The port to listen on.")
 	flag.StringVar(&flags.cacheDir, "cache-dir", "./cache", "The directory to store the cache in.")
 	flag.IntVar(&flags.timeout, "timeout", 5, "The timeout for requests in seconds.")
 	flag.StringVar(&flags.logfile, "logfile", "", "The logfile to write to (none for stdout).")

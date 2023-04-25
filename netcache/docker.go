@@ -27,12 +27,12 @@ var flags struct {
 	cli bool
 }
 
-func init() {
+func setup() {
 	var (
 		err1, err2, err3 error
 	)
 	flags.address = "127.0.0.1"
-	flags.port, err1 = strconv.Atoi(getEnv("PORT", "8080"))
+	flags.port, err1 = strconv.Atoi(getEnv("PORT", "2392"))
 	flags.cacheDir = getEnv("CACHE_DIR", "/netcache/cache")
 	flags.timeout, err2 = strconv.Atoi(getEnv("TIMEOUT", "60"))
 	flags.logfile = getEnv("LOGFILE", "/netcache/log/netcache.log")

@@ -13,6 +13,6 @@ RUN rm -rf /netcache/github-repo
 
 EXPOSE 8080
 
-# ENTRYPOINT [ "/netcache/netcache_server" ]
-CMD [ "/netcache/netcache_server" ]
+ENTRYPOINT [ "/netcache/netcache_server" ]
+# CMD [ "/netcache/netcache_server" ]
 
