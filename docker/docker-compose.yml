@@ -9,7 +9,7 @@ services:
       PORT: 2392
       CACHE_DIR: /netcache/cache
       TIMEOUT: 300
-      LOGFILE: /netcache/log/netcache.log
+      # LOGFILE: /netcache/log/netcache.log
       LOGLEVEL: DEBUG
       MEMCACHE: false
     ports:

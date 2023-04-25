@@ -31,7 +31,7 @@ func setup() {
 	var (
 		err1, err2, err3 error
 	)
-	flags.address = "127.0.0.1"
+	flags.address = "0.0.0.0"
 	flags.port, err1 = strconv.Atoi(getEnv("PORT", "2392"))
 	flags.cacheDir = getEnv("CACHE_DIR", "/netcache/cache")
 	flags.timeout, err2 = strconv.Atoi(getEnv("TIMEOUT", "60"))
