@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  app:
+    build:
+      dockerfile: Dockerfile
+    environment:
+      PORT: 2392
+      CACHE_DIR: /netcache/cache
+      TIMEOUT: 300
+      LOGFILE: /netcache/log/netcache.log
+      LOGLEVEL: DEBUG
+      MEMCACHE: false
+    ports:
+    - "2392:2392"
+    volumes:
+      - cache_data:/netcache/cache
+volumes:
+  cache_data:
+
