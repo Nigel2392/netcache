@@ -48,12 +48,22 @@ func newPool(serverAddr string, connections int) (*connectionPool, error) {
 }
 
 func (p *connectionPool) get(deadline time.Duration) net.Conn {
+	if deadline == 0 {
+		deadline = 5 * time.Second
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	var conn, ok = p.pool.PopOK()
 	if !ok {
-		return nil
+		var c, okChan = p.pool.PopOKWaiter(deadline / 2)
+		select {
+		case <-okChan:
+			return nil
+		case conn = <-c:
+			deadline = deadline / 2
+		}
 	}
 
 	if err := conn.SetDeadline(time.Now().Add(deadline)); err != nil {
