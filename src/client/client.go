@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/Nigel2392/go-datastructures/stack"
 	"github.com/Nigel2392/netcache/src/cache"
 	"github.com/Nigel2392/netcache/src/protocols"
 )
@@ -14,6 +16,58 @@ import (
 func init() {
 	// here to make sure the cache client implements the cache interface
 	var _ = Cache(&CacheClient{})
+}
+
+type connectionPool struct {
+	// The address of the server.
+	ServerAddr string
+
+	// the connection pool
+	pool *stack.Stack[net.Conn]
+
+	// mutex
+	mu sync.Mutex
+}
+
+func newPool(serverAddr string, connections int) (*connectionPool, error) {
+
+	var p = &connectionPool{
+		ServerAddr: serverAddr,
+		pool:       &stack.Stack[net.Conn]{},
+	}
+
+	for i := 0; i < connections; i++ {
+		var conn, err = net.Dial("tcp", serverAddr)
+		if err != nil {
+			return nil, err
+		}
+		p.pool.Push(conn)
+	}
+
+	return p, nil
+}
+
+func (p *connectionPool) get(deadline time.Duration) net.Conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var conn, ok = p.pool.PopOK()
+	if !ok {
+		return nil
+	}
+
+	if err := conn.SetDeadline(time.Now().Add(deadline)); err != nil {
+		return nil
+	}
+
+	return conn
+}
+
+func (p *connectionPool) put(conn net.Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.pool.Push(conn)
 }
 
 type cacheItem struct {
@@ -39,14 +93,19 @@ type CacheClient struct {
 	ServerAddr string
 
 	// The connection to the server.
-	conn net.Conn
+	pool *connectionPool
 
 	// The serializer to use for values.
 	Serializer protocols.Serializer
+
+	timeout time.Duration
+
+	// the amount of connections to keep open
+	connections int
 }
 
 // Create a new cache client.
-func New(serverAddr string, serializer protocols.Serializer) *CacheClient {
+func New(serverAddr string, serializer protocols.Serializer, timeout time.Duration, connections int) *CacheClient {
 	var c = &CacheClient{
 		ServerAddr: serverAddr,
 	}
@@ -57,22 +116,46 @@ func New(serverAddr string, serializer protocols.Serializer) *CacheClient {
 		c.Serializer = &protocols.GobSerializer{}
 	}
 
+	if timeout != 0 {
+		c.timeout = timeout
+	} else {
+		c.timeout = 5 * time.Second
+	}
+
+	if connections != 0 {
+		c.connections = connections
+	} else {
+		c.connections = 10
+	}
+
 	return c
 }
 
 // Connect to the cache.
 func (c *CacheClient) Connect() error {
 	var err error
-	if c.Serializer == nil {
-		c.Serializer = &protocols.GobSerializer{}
+	var pool *connectionPool
+	pool, err = newPool(c.ServerAddr, c.connections)
+	if err != nil {
+		return err
 	}
-	c.conn, err = net.Dial("tcp", c.ServerAddr)
-	return err
+	c.pool = pool
+	return nil
 }
 
 // Close the connection to the cache.
 func (c *CacheClient) Close() error {
-	return c.conn.Close()
+	for i := 0; i < c.connections; i++ {
+		var conn = c.pool.get(c.timeout)
+		if conn == nil {
+			continue
+		}
+		if err := conn.Close(); err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
 
 // Get an item from the cache.
@@ -88,12 +171,14 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 		Key:  key,
 	}
 
-	_, err := message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	_, err := message.WriteTo(conn)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = message.ReadFrom(c.conn)
+	_, err = message.ReadFrom(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +189,11 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 		return nil, fmt.Errorf("unexpected message type from server instead of GET message: %d", message.Type)
 	}
 
-	err = c.listenForEnd()
+	err = c.listenForEnd(conn)
+	if err != nil {
+		return nil, err
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -163,12 +252,14 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 		TTL:   ttl,
 	}
 
-	_, err = message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	_, err = message.WriteTo(conn)
 	if err != nil {
 		return err
 	}
 
-	return c.listenForEnd()
+	return c.listenForEnd(conn)
 }
 
 // Delete an item from the cache.
@@ -182,12 +273,13 @@ func (c *CacheClient) Delete(key string) error {
 		Key:  key,
 	}
 
-	_, err := message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	var _, err = message.WriteTo(conn)
 	if err != nil {
 		return err
 	}
-
-	return c.listenForEnd()
+	return c.listenForEnd(conn)
 }
 
 // Clear the cache.
@@ -196,12 +288,13 @@ func (c *CacheClient) Clear() error {
 		Type: protocols.TypeCLEAR,
 	}
 
-	_, err := message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	var _, err = message.WriteTo(conn)
 	if err != nil {
 		return err
 	}
-
-	return c.listenForEnd()
+	return c.listenForEnd(conn)
 }
 
 // Check if the cache has an item.
@@ -214,13 +307,14 @@ func (c *CacheClient) Has(key string) (bool, error) {
 		Type: protocols.TypeHAS,
 		Key:  key,
 	}
-
-	_, err := message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	_, err := message.WriteTo(conn)
 	if err != nil {
 		return false, err
 	}
 
-	_, err = message.ReadFrom(c.conn)
+	_, err = message.ReadFrom(conn)
 	if err != nil {
 		return false, err
 	}
@@ -237,7 +331,8 @@ func (c *CacheClient) Has(key string) (bool, error) {
 		return false, err
 	}
 
-	err = c.listenForEnd()
+	err = c.listenForEnd(conn)
+
 	if err != nil {
 		return false, err
 	}
@@ -251,12 +346,14 @@ func (c *CacheClient) Keys() ([]string, error) {
 		Type: protocols.TypeKEYS,
 	}
 
-	_, err := message.WriteTo(c.conn)
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	_, err := message.WriteTo(conn)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = message.ReadFrom(c.conn)
+	_, err = message.ReadFrom(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -264,10 +361,15 @@ func (c *CacheClient) Keys() ([]string, error) {
 	if message.Type == protocols.TypeERROR {
 		return nil, fmt.Errorf("error from server: %s", message.Value)
 	}
-	err = c.listenForEnd()
+	err = c.listenForEnd(conn)
 	if err != nil {
 		return nil, err
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
 	message.Value = bytes.Trim(message.Value, ",")
 	var keys []string = strings.Split(string(message.Value), ",")
 	for i, key := range keys {
@@ -281,9 +383,9 @@ func (c *CacheClient) Keys() ([]string, error) {
 	return keys, nil
 }
 
-func (c *CacheClient) listenForEnd() error {
+func (c *CacheClient) listenForEnd(conn net.Conn) error {
 	var message = new(protocols.Message)
-	_, err := message.ReadFrom(c.conn)
+	_, err := message.ReadFrom(conn)
 	if err != nil {
 		return err
 	}

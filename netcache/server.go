@@ -61,7 +61,7 @@ func dumpFlags(logger logger.Logger) {
 }
 
 func startCLI() {
-	var client = client.New(fmt.Sprintf("%s:%d", flags.address, flags.port), nil)
+	var client = client.New(fmt.Sprintf("%s:%d", flags.address, flags.port), nil, time.Duration(flags.timeout)*time.Second, 10)
 	var err = client.Connect()
 	if err != nil {
 		panic(err)
