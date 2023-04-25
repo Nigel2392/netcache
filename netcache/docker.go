@@ -31,15 +31,25 @@ func init() {
 	var (
 		err1, err2, err3 error
 	)
-	flags.address = "localhost"
-	flags.port, err1 = strconv.Atoi(os.Getenv("PORT"))
-	flags.cacheDir = os.Getenv("CACHE_DIR")
-	flags.timeout, err2 = strconv.Atoi(os.Getenv("TIMEOUT"))
-	flags.logfile = os.Getenv("LOGFILE")
-	flags.loglevel = os.Getenv("LOGLEVEL")
-	flags.memcache, err3 = strconv.ParseBool(os.Getenv("MEMCACHE"))
+	flags.address = "127.0.0.1"
+	flags.port, err1 = strconv.Atoi(getEnv("PORT", "8080"))
+	flags.cacheDir = getEnv("CACHE_DIR", "/netcache/cache")
+	flags.timeout, err2 = strconv.Atoi(getEnv("TIMEOUT", "60"))
+	flags.logfile = getEnv("LOGFILE", "/netcache/log/netcache.log")
+	flags.loglevel = getEnv("LOGLEVEL", "INFO")
+	flags.memcache, err3 = strconv.ParseBool(getEnv("MEMCACHE", "false"))
 
 	if err1 != nil || err2 != nil || err3 != nil {
 		panic("Invalid environment variables")
 	}
+}
+
+func getEnv(key string, def ...string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	if len(def) > 0 {
+		return def[0]
+	}
+	return ""
 }
