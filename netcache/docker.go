@@ -31,7 +31,7 @@ func init() {
 	var (
 		err1, err2, err3 error
 	)
-	flags.address = "127.0.0.1"
+	flags.address = "localhost"
 	flags.port, err1 = strconv.Atoi(os.Getenv("PORT"))
 	flags.cacheDir = os.Getenv("CACHE_DIR")
 	flags.timeout, err2 = strconv.Atoi(os.Getenv("TIMEOUT"))
