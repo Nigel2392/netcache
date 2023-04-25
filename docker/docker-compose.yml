@@ -1,9 +1,10 @@
 version: "3.9"
 services:
   app:
-    image: netcache
+    # image: netcache
     build:
       context: .
+      dockerfile: Dockerfile
     environment:
       PORT: 2392
       CACHE_DIR: /netcache/cache
