@@ -35,7 +35,7 @@ func setup() {
 	flags.port, err1 = strconv.Atoi(getEnv("PORT", "2392"))
 	flags.cacheDir = getEnv("CACHE_DIR", "/netcache/cache")
 	flags.timeout, err2 = strconv.Atoi(getEnv("TIMEOUT", "60"))
-	flags.logfile = getEnv("LOGFILE", "/netcache/log/netcache.log")
+	flags.logfile = getEnv("LOGFILE")
 	flags.loglevel = getEnv("LOGLEVEL", "INFO")
 	flags.memcache, err3 = strconv.ParseBool(getEnv("MEMCACHE", "false"))
 

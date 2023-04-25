@@ -1,8 +1,8 @@
 version: "3.9"
 services:
   app:
+    image: netcache
     build:
-      dockerfile: Dockerfile
       context: .
     environment:
       PORT: 2392
