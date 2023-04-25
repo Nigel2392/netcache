@@ -88,19 +88,15 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 		Key:  key,
 	}
 
-	fmt.Println("sending message")
 	_, err := message.WriteTo(c.conn)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("reading message")
 	_, err = message.ReadFrom(c.conn)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("got message", message)
 
 	if message.Type == protocols.TypeERROR {
 		return nil, fmt.Errorf("error from server: %s", message.Value)

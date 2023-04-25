@@ -1,16 +1,16 @@
 version: "3.9"
 services:
   app:
-    # image: netcache
+    image: nigel2392/netcache
     build:
       context: .
-      dockerfile: Dockerfile
+      # dockerfile: Dockerfile
     environment:
       PORT: 2392
       CACHE_DIR: /netcache/cache
       TIMEOUT: 300
-      # LOGFILE: /netcache/log/netcache.log
-      LOGLEVEL: DEBUG
+      LOGFILE: /netcache/log/netcache.log
+      LOGLEVEL: INFO
       MEMCACHE: false
     ports:
       - "2392:2392"
