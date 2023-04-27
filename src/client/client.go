@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +53,10 @@ func (p *connectionPool) get(deadline time.Duration) net.Conn {
 		deadline = 5 * time.Second
 	}
 
+	if p == nil {
+		return nil
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -74,6 +79,9 @@ func (p *connectionPool) get(deadline time.Duration) net.Conn {
 }
 
 func (p *connectionPool) put(conn net.Conn) {
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -147,6 +155,15 @@ func (c *CacheClient) Connect() error {
 	var pool *connectionPool
 	pool, err = newPool(c.ServerAddr, c.connections)
 	if err != nil {
+		// Set the client to nil, return the error.
+		var valueOf = reflect.ValueOf(c)
+		valueOf.
+			Elem().
+			Set(
+				reflect.Zero(
+					valueOf.Elem().Type(),
+				),
+			)
 		return err
 	}
 	c.pool = pool
@@ -155,6 +172,9 @@ func (c *CacheClient) Connect() error {
 
 // Close the connection to the cache.
 func (c *CacheClient) Close() error {
+	if c == nil {
+		return nil
+	}
 	for i := 0; i < c.connections; i++ {
 		var conn = c.pool.get(c.timeout)
 		if conn == nil {
@@ -172,6 +192,9 @@ func (c *CacheClient) Close() error {
 //
 // Destination is only used if a serializer has been set.
 func (c *CacheClient) Get(key string, dst any) (Item, error) {
+	if c == nil {
+		return nil, fmt.Errorf("cache client is nil")
+	}
 	if err := cache.IsValidKey(key); err != nil {
 		return nil, err
 	}
@@ -231,6 +254,9 @@ func (c *CacheClient) Get(key string, dst any) (Item, error) {
 //
 // Otherwise, the value must be a []byte or string.
 func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
+	if c == nil {
+		return fmt.Errorf("cache client is nil")
+	}
 	if err := cache.IsValidKey(key); err != nil {
 		return err
 	}
@@ -274,6 +300,9 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 
 // Delete an item from the cache.
 func (c *CacheClient) Delete(key string) error {
+	if c == nil {
+		return fmt.Errorf("cache client is nil")
+	}
 	if err := cache.IsValidKey(key); err != nil {
 		return err
 	}
@@ -294,6 +323,9 @@ func (c *CacheClient) Delete(key string) error {
 
 // Clear the cache.
 func (c *CacheClient) Clear() error {
+	if c == nil {
+		return fmt.Errorf("cache client is nil")
+	}
 	var message = &protocols.Message{
 		Type: protocols.TypeCLEAR,
 	}
@@ -309,6 +341,9 @@ func (c *CacheClient) Clear() error {
 
 // Check if the cache has an item.
 func (c *CacheClient) Has(key string) (bool, error) {
+	if c == nil {
+		return false, fmt.Errorf("cache client is nil")
+	}
 	if err := cache.IsValidKey(key); err != nil {
 		return false, err
 	}
@@ -352,6 +387,9 @@ func (c *CacheClient) Has(key string) (bool, error) {
 
 // Retrieve the keys in the cache.
 func (c *CacheClient) Keys() ([]string, error) {
+	if c == nil {
+		return nil, fmt.Errorf("cache client is nil")
+	}
 	var message = &protocols.Message{
 		Type: protocols.TypeKEYS,
 	}
