@@ -48,6 +48,7 @@ func newPool(serverAddr string, connections int) (*connectionPool, error) {
 	return p, nil
 }
 
+// get a connection from the pool
 func (p *connectionPool) get(deadline time.Duration) net.Conn {
 	if deadline == 0 {
 		deadline = 5 * time.Second
