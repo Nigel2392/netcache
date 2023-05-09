@@ -62,7 +62,7 @@ func (p *connectionPool) get(deadline time.Duration) net.Conn {
 
 	var conn, ok = p.pool.PopOK()
 	if !ok {
-		var c, okChan = p.pool.PopOKWaiter(deadline / 2)
+		var c, okChan = p.pool.PopOKDeadline(deadline / 2)
 		select {
 		case <-okChan:
 			return nil
