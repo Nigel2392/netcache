@@ -1,3 +1,6 @@
 {
+    //  "go.buildFlags": [
+    //      "-tags", "docker"
+    //  ],
     "workbench.colorTheme": "2077"
 }

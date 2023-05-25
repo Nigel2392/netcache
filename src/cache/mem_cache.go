@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"bytes"
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -20,6 +22,32 @@ func NewMemoryCache() Cache {
 	return NewGenericMemoryCache[[]byte]()
 }
 
+// Dump the cache to bytes.
+func (c *MemoryCache[T]) Dump() ([]byte, error) {
+	var buf bytes.Buffer
+	var enc = json.NewEncoder(&buf)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	err := enc.Encode(c.cache)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Load the cache from bytes.
+func (c *MemoryCache[T]) Load(data []byte) error {
+	var buf = bytes.NewBuffer(data)
+	var dec = json.NewDecoder(buf)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	err := dec.Decode(&c.cache)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Might as well make it generic, right?
 func NewGenericMemoryCache[T any]() *MemoryCache[T] {
 	return &MemoryCache[T]{
@@ -37,9 +65,9 @@ func (c *MemoryCache[T]) Run(interval time.Duration) {
 func (c *MemoryCache[T]) Set(key string, value T, ttl time.Duration) (inserted bool, err error) {
 	var item *memitem[T]
 	item = &memitem[T]{
-		key:   key,
-		value: value,
-		ttl:   ttl,
+		Key:   key,
+		Value: value,
+		TTL:   ttl,
 	}
 
 	c.mu.Lock()
@@ -55,8 +83,8 @@ func (c *MemoryCache[T]) Get(key string) (value T, ttl time.Duration, err error)
 	if !ok {
 		return value, 0, ErrItemNotFound
 	}
-	item.ttl -= time.Since(c.lastTick)
-	return item.value, item.ttl, nil
+	item.TTL -= time.Since(c.lastTick)
+	return item.Value, item.TTL, nil
 }
 
 func (c *MemoryCache[T]) Delete(key string) (deleted bool, err error) {
@@ -104,8 +132,8 @@ func (c *MemoryCache[T]) Has(key string) (ttl time.Duration, has bool) {
 	if !ok {
 		return 0, false
 	}
-	item.ttl -= time.Since(c.lastTick)
-	return item.ttl, true
+	item.TTL -= time.Since(c.lastTick)
+	return item.TTL, true
 }
 
 func (c *MemoryCache[T]) work() {
@@ -116,8 +144,8 @@ func (c *MemoryCache[T]) work() {
 		case <-c.cleanupTicker.C:
 			c.mu.Lock()
 			for key, item := range c.cache {
-				item.ttl -= time.Since(c.lastTick)
-				if item.ttl <= 0 {
+				item.TTL -= time.Since(c.lastTick)
+				if item.TTL <= 0 {
 					delete(c.cache, key)
 				}
 			}

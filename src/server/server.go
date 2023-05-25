@@ -1,9 +1,13 @@
 package server
 
 import (
+	"bytes"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"time"
 
@@ -14,7 +18,7 @@ import (
 
 type CacheServer struct {
 	// The cache to use.
-	cache cache.Cache
+	Cache cache.Cache
 	// The address to listen on.
 	address string
 	// The port to listen on.
@@ -26,50 +30,181 @@ type CacheServer struct {
 }
 
 // NewCacheServer creates a new cache server.
-func New(address string, port int, cacheDir string, timeout time.Duration, c cache.Cache) *CacheServer {
-	var logger = logger.Newlogger(logger.INFO, os.Stdout)
+func New(address string, port int, timeout time.Duration, c cache.Cache) *CacheServer {
+
 	if c == nil {
-		c = cache.NewFileCache(cacheDir)
+		c = cache.NewMemoryCache()
 	}
-	return &CacheServer{
-		cache:   c,
+
+	if timeout <= 0 {
+		timeout = time.Minute
+	}
+
+	var s = &CacheServer{
+		Cache:   c,
 		address: address,
 		port:    port,
 		timeout: timeout,
-		logger:  logger,
 	}
+
+	return s
 }
 
-// NewLogger creates a new logger for the server.
-func (s *CacheServer) NewLogger(logger logger.Logger) error {
+func (s *CacheServer) SavePeriodically(init_file string, interval time.Duration) (stop func()) {
+	var t = time.NewTicker(interval)
+	go func() {
+		var errs int
+		var err error
+		for range t.C {
+			err = s.Save(init_file)
+			if err != nil {
+				if s.logger != nil {
+					s.logger.Critical(fmt.Errorf("Error saving cache: %s\n", err))
+				}
+				errs++
+			}
+			if errs > 5 {
+				if s.logger != nil {
+					s.logger.Critical(fmt.Errorf("Too many errors saving cache, exiting."))
+				}
+				os.Exit(1)
+			}
+		}
+	}()
+	return t.Stop
+}
+
+// SaveOnInterrupt saves the cache when the program is interrupted.
+func (s *CacheServer) SaveOnInterrupt(init_file string) {
+	var c = make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		s.Save(init_file)
+		os.Exit(0)
+	}()
+}
+
+func (s *CacheServer) Save(init_file string) error {
 	if s.logger != nil {
-		s.logger = logger
+		s.logger.Debug("Saving cache...")
+	}
+	var b, err = s.Cache.Dump()
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error dumping cache: %s\n", err))
+		}
+		return err
+	}
+	if s.logger != nil {
+		s.logger.Debug("Writing cache...")
+	}
+	f, err := os.OpenFile(init_file, os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error opening init file: %s\n", err))
+		}
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(b)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error writing init file: %s\n", err))
+		}
+	}
+	return err
+}
+
+// Load loads the cache from the init file.
+func (s *CacheServer) Load(init_file string) error {
+	var f *os.File
+	var err error
+
+	if s.logger != nil {
+		s.logger.Debug("Reading init file...")
+	}
+
+	if f, err = os.Open(init_file); err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error opening init file: %s\n", err))
+		}
+		return err
+	}
+
+	var b bytes.Buffer
+	if _, err = b.ReadFrom(f); err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error reading init file: %s\n", err))
+		}
+		return err
+	}
+
+	if s.logger != nil {
+		s.logger.Debug("Loading cache...")
+	}
+
+	err = s.Cache.Load(b.Bytes())
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Critical(fmt.Errorf("Error loading cache: %s\n", err))
+		}
+		return err
 	}
 	return nil
 }
 
-// ListenAndServe starts the server.
-func (s *CacheServer) ListenAndServe() error {
+// NewLogger creates a new logger for the server.
+func (s *CacheServer) NewLogger(logger logger.Logger) {
+	s.logger = logger
+}
+
+// Function to run before the server starts to listen.
+func (s *CacheServer) preInit() {
 	if s.logger != nil {
 		s.logger.Info("Starting cache...")
 	}
-	s.cache.Run(time.Minute / 2)
+	s.Cache.Run(time.Minute / 2)
 	if s.logger != nil {
 		s.logger.Infof("Listening on %s:%d\n", s.address, s.port)
 	}
+}
+
+// ListenAndServe starts the server.
+func (s *CacheServer) ListenAndServe() error {
+	s.preInit()
 	var l, err = net.Listen("tcp", s.address+":"+strconv.Itoa(s.port))
 	if err != nil {
 		return err
 	}
 	defer l.Close()
 	if s.logger != nil {
-		s.logger.Info("Waiting for connection...")
+		s.logger.Info("Waiting for connections...")
 	}
+	return s.listen(l)
+}
+
+// ListenAndServeTLS starts the server with TLS.
+func (s *CacheServer) ListenAndServeTLS(conf *tls.Config) error {
+	s.preInit()
+	var l, err = tls.Listen("tcp", s.address+":"+strconv.Itoa(s.port), conf)
+	if err != nil {
+		return err
+	}
+	defer l.Close()
+	if s.logger != nil {
+		s.logger.Info("Waiting for TLS connections...")
+	}
+	return s.listen(l)
+}
+
+// Function to run to listen for connections.
+func (s *CacheServer) listen(l net.Listener) error {
 	for {
 		var c, err = l.Accept()
 		if err != nil {
 			if s.logger != nil {
-				s.logger.Warningf("Error accepting connection: %s (%s)\n", err, c.RemoteAddr().String())
+				s.logger.Errorf("Error accepting connection: %s (%s)\n", err, c.RemoteAddr().String())
 			}
 			return err
 		}
@@ -122,6 +257,11 @@ func (s *CacheServer) handle(c net.Conn) {
 					s.logger.Debugf("Received HAS request for key %s\n", message.Key)
 				}
 				err = s.handleHas(c, message)
+			case protocols.TypePING:
+				if s.logger != nil {
+					s.logger.Debug("Received PING request")
+				}
+				err = s.handlePing(c)
 			case protocols.TypeKEYS:
 				if s.logger != nil {
 					s.logger.Debug("Received KEYS request")

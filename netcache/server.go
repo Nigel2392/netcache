@@ -21,6 +21,10 @@ func main() {
 		return
 	}
 
+	if flags.cacheDir == "" {
+		flags.cacheDir = "./netcache-data"
+	}
+
 	var c cache.Cache
 	if flags.memcache {
 		c = cache.NewMemoryCache()
@@ -28,7 +32,16 @@ func main() {
 		c = cache.NewFileCache(flags.cacheDir)
 	}
 
-	var server = server.New(flags.address, flags.port, flags.cacheDir, time.Duration(flags.timeout)*time.Second, c)
+	if flags.initFile == "" {
+		flags.initFile = fmt.Sprintf("%s/init.netcache", flags.cacheDir)
+	}
+
+	var savePeriod time.Duration
+	if flags.savePeriod > 0 {
+		savePeriod = time.Duration(flags.savePeriod) * time.Millisecond
+	}
+
+	var server = server.New(flags.address, flags.port, time.Duration(flags.timeout)*time.Second, c)
 	var std io.Writer
 	var err error
 	if flags.logfile != "" {
@@ -42,6 +55,14 @@ func main() {
 	)
 
 	dumpFlags(logger)
+
+	if flags.saveOnInterrupt {
+		server.SaveOnInterrupt(flags.initFile)
+	}
+
+	if savePeriod > 0 {
+		server.SavePeriodically(flags.initFile, savePeriod)
+	}
 
 	err = server.ListenAndServe()
 	if err != nil {

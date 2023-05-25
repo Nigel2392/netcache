@@ -26,4 +26,6 @@ type Cache interface {
 	Has(key string) (bool, error)
 	// Keys returns all keys in the cache.
 	Keys() ([]string, error)
+	// Ping the cache.
+	Ping() error
 }

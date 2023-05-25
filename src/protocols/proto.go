@@ -22,6 +22,8 @@ const (
 	TypeKEYS
 	TypeERROR
 	TypeEND
+	TypePING
+	TypePONG
 )
 
 var msgTypeMap = map[MessageType]string{
@@ -33,6 +35,8 @@ var msgTypeMap = map[MessageType]string{
 	TypeKEYS:   "KEYS",
 	TypeERROR:  "ERROR",
 	TypeEND:    "END",
+	TypePING:   "PING",
+	TypePONG:   "PONG",
 }
 
 // A message to be sent, or read from.

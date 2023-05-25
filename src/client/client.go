@@ -6,10 +6,8 @@ import (
 	"net"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/Nigel2392/go-datastructures/stack"
 	"github.com/Nigel2392/netcache/src/cache"
 	"github.com/Nigel2392/netcache/src/protocols"
 )
@@ -17,76 +15,6 @@ import (
 func init() {
 	// here to make sure the cache client implements the cache interface
 	var _ = Cache(&CacheClient{})
-}
-
-type connectionPool struct {
-	// The address of the server.
-	ServerAddr string
-
-	// the connection pool
-	pool *stack.Stack[net.Conn]
-
-	// mutex
-	mu sync.Mutex
-}
-
-func newPool(serverAddr string, connections int) (*connectionPool, error) {
-
-	var p = &connectionPool{
-		ServerAddr: serverAddr,
-		pool:       &stack.Stack[net.Conn]{},
-	}
-
-	for i := 0; i < connections; i++ {
-		var conn, err = net.Dial("tcp", serverAddr)
-		if err != nil {
-			return nil, err
-		}
-		p.pool.Push(conn)
-	}
-
-	return p, nil
-}
-
-// get a connection from the pool
-func (p *connectionPool) get(deadline time.Duration) net.Conn {
-	if deadline == 0 {
-		deadline = 5 * time.Second
-	}
-
-	if p == nil {
-		return nil
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	var conn, ok = p.pool.PopOK()
-	if !ok {
-		var c, okChan = p.pool.PopOKDeadline(deadline / 2)
-		select {
-		case <-okChan:
-			return nil
-		case conn = <-c:
-			deadline = deadline / 2
-		}
-	}
-
-	if err := conn.SetDeadline(time.Now().Add(deadline)); err != nil {
-		return nil
-	}
-
-	return conn
-}
-
-func (p *connectionPool) put(conn net.Conn) {
-	if p == nil {
-		return
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.pool.Push(conn)
 }
 
 type cacheItem struct {
@@ -154,17 +82,24 @@ func New(serverAddr string, serializer protocols.Serializer, timeout time.Durati
 func (c *CacheClient) Connect() error {
 	var err error
 	var pool *connectionPool
+
+	if c == nil {
+		return fmt.Errorf("cache client is nil")
+	}
+
+	if c.connections <= 0 {
+		c.connections = 4
+	}
+
 	pool, err = newPool(c.ServerAddr, c.connections)
 	if err != nil {
 		// Set the client to nil, return the error.
 		var valueOf = reflect.ValueOf(c)
-		valueOf.
-			Elem().
-			Set(
-				reflect.Zero(
-					valueOf.Elem().Type(),
-				),
-			)
+		valueOf.Elem().Set(
+			reflect.Zero(
+				valueOf.Elem().Type(),
+			),
+		)
 		return err
 	}
 	c.pool = pool
@@ -262,6 +197,8 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 		return err
 	}
 
+	fmt.Println("value", value)
+
 	var v []byte
 	var err error
 	if c.Serializer == nil {
@@ -290,6 +227,8 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 	}
 
 	var conn = c.pool.get(c.timeout)
+	fmt.Println("conn", conn)
+
 	defer c.pool.put(conn)
 	_, err = message.WriteTo(conn)
 	if err != nil {
@@ -297,6 +236,31 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 	}
 
 	return c.listenForEnd(conn)
+}
+
+func (c *CacheClient) Ping() error {
+	if c == nil {
+		return fmt.Errorf("cache client is nil")
+	}
+	var message = &protocols.Message{
+		Type: protocols.TypePING,
+	}
+
+	var conn = c.pool.get(c.timeout)
+	defer c.pool.put(conn)
+	_, err := message.WriteTo(conn)
+	if err != nil {
+		return err
+	}
+	var pong = new(protocols.Message)
+	_, err = pong.ReadFrom(conn)
+	if err != nil {
+		return err
+	}
+	if pong.Type != protocols.TypePONG {
+		return fmt.Errorf("unexpected message type from server instead of PONG message: %d", message.Type)
+	}
+	return nil
 }
 
 // Delete an item from the cache.

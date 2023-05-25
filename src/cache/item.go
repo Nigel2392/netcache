@@ -10,19 +10,30 @@ import (
 	"time"
 )
 
-var keyRegex = regexp.MustCompile(`^[a-zA-Z0-9\._\-]+$`).MatchString
+//	var allowedChars = map[rune]bool{
+//		'.': true,
+//		'-': true,
+//		'_': true,
+//	}
+//	for _, char := range key {
+//		if !allowedChars[char] && !('a' <= char && char <= 'z') && !('A' <= char && char <= 'Z') && !('0' <= char && char <= '9') {
+//			return fmt.Errorf("key '%s' contains invalid characters", key)
+//		}
+//	}
+
+var keyRegexFunc = regexp.MustCompile(`^[a-zA-Z0-9\._\-]+$`).MatchString
 
 type memitem[T any] struct {
-	key   string
-	value T
-	ttl   time.Duration
+	Key   string
+	Value T
+	TTL   time.Duration
 }
 
 type item struct {
-	key      string        // the key the filename of the cached item, this cannot contain any special characters
-	hash     uint64        // the hash is the directory the key is stored in
-	ttl      time.Duration // the time to live of the cached item
-	filepath string        // the filepath of the cached item
+	Key      string        // the key the filename of the cached item, this cannot contain any special characters
+	Hash     uint64        // the hash is the directory the key is stored in
+	TTL      time.Duration // the time to live of the cached item
+	Filepath string        // the filepath of the cached item
 	err      chan error
 }
 
@@ -41,9 +52,9 @@ func newItem(key string, ttl time.Duration) (*item, error) {
 	}
 
 	var item = &item{
-		key:  key,
-		hash: strHash(key),
-		ttl:  ttl,
+		Key:  key,
+		Hash: strHash(key),
+		TTL:  ttl,
 		err:  make(chan error, 1),
 	}
 
@@ -56,8 +67,8 @@ func newItemKey(key string) (*item, error) {
 	}
 
 	var item = &item{
-		key:  key,
-		hash: strHash(key),
+		Key:  key,
+		Hash: strHash(key),
 	}
 	return item, nil
 }
@@ -67,7 +78,7 @@ func IsValidKey(key string) error {
 		return fmt.Errorf("key '%s' is too short", key)
 	}
 
-	if !keyRegex(key) {
+	if !keyRegexFunc(key) {
 		return fmt.Errorf("key '%s' contains invalid characters", key)
 	}
 
@@ -84,8 +95,8 @@ func (c *item) write(dir string, value []byte) {
 		itemPath string
 		file     *os.File
 	)
-	if c.ttl <= time.Second {
-		c.err <- fmt.Errorf("ttl '%s' is too short", c.ttl)
+	if c.TTL <= time.Second {
+		c.err <- fmt.Errorf("ttl '%s' is too short", c.TTL)
 	}
 
 	path, itemPath = c.getpath(dir)
@@ -111,9 +122,9 @@ func (c *item) write(dir string, value []byte) {
 }
 
 func (c *item) read(dir string) (value []byte, err error) {
-	if c.ttl <= 0 {
+	if c.TTL <= 0 {
 		c.delete(dir)
-		return nil, fmt.Errorf("item has expired: %d", c.ttl)
+		return nil, fmt.Errorf("item has expired: %d", c.TTL)
 	}
 
 	var _, itemPath = c.getpath(dir)
@@ -164,19 +175,19 @@ func removeIfEmpty(path string) (err error) {
 }
 
 func (c *item) getpath(dir string) (path, itemPath string) {
-	path = filepath.Join(dir, strconv.FormatUint(c.hash, 10))
-	itemPath = filepath.Join(path, c.key)
+	path = filepath.Join(dir, strconv.FormatUint(c.Hash, 10))
+	itemPath = filepath.Join(path, c.Key)
 	return path, itemPath
 }
 
 func (c *item) Equals(other *item) bool {
-	return c.key == other.key
+	return c.Key == other.Key
 }
 
 func (c *item) Gt(other *item) bool {
-	return c.key > other.key
+	return c.Key > other.Key
 }
 
 func (c *item) Lt(other *item) bool {
-	return c.key < other.key
+	return c.Key < other.Key
 }

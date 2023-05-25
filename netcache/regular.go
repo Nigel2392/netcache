@@ -22,6 +22,13 @@ var flags struct {
 	memcache bool
 	// Use the built-in cli
 	cli bool
+
+	// The init file to use.
+	initFile string
+	// period to save cache in milliseconds
+	savePeriod int
+	// save on interrupt
+	saveOnInterrupt bool
 }
 
 func setup() {
@@ -33,5 +40,11 @@ func setup() {
 	flag.StringVar(&flags.loglevel, "loglevel", "INFO", "The log level to use. (\"CRITICAL\", \"ERROR\", \"WARNING\", \"INFO\", \"DEBUG\", \"TEST\")")
 	flag.BoolVar(&flags.memcache, "memory", false, "Use an in-memory cache.")
 	flag.BoolVar(&flags.cli, "cli", false, "Use the built-in cli.")
+	flag.StringVar(&flags.initFile, "dump.netcache", "", "The init file to use.")
+	flag.BoolVar(&flags.saveOnInterrupt, "soi", false, "Save cache on interrupt.")
+	flag.IntVar(&flags.savePeriod, "saveperiod", 500, "Period to save cache in milliseconds.")
 	flag.Parse()
+	if flags.savePeriod < 0 {
+		flags.savePeriod = 500
+	}
 }

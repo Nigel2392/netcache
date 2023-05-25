@@ -1,13 +1,15 @@
 package cache
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/Nigel2392/go-datastructures/binarytree"
+	"github.com/Nigel2392/netcache/src/cache/binarytree"
 )
 
 const DefaultCleanupInterval = 5 * time.Minute
@@ -43,6 +45,56 @@ func NewFileCache(dir string) Cache {
 		cache: binarytree.InterfacedBST[*item]{},
 		dir:   dir,
 	}
+}
+
+// Dump the cache to bytes.
+func (c *FileCache) Dump() ([]byte, error) {
+	var buf bytes.Buffer
+	var enc = gob.NewEncoder(&buf)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	err := enc.Encode(c.cache)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Load the cache from bytes.
+func (c *FileCache) Load(data []byte) error {
+	var buf = bytes.NewBuffer(data)
+	var dec = gob.NewDecoder(buf)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	err := dec.Decode(&c.cache)
+	if err != nil {
+		return err
+	}
+
+	// Verify the integrity of the cache.
+	//
+	// Delete any items not found in the filesystem.
+	if c.cache.Len() > 0 {
+		return c.VerifyIntegrity()
+	}
+
+	return nil
+}
+
+// Verify the integrity of the cache.
+func (c *FileCache) VerifyIntegrity() error {
+	var errs []error = make([]error, 0)
+
+	c.cache.DeleteIf(func(i *item) bool {
+		var _, itemPath = i.getpath(c.dir)
+		var _, err = os.Stat(itemPath)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		return err != nil
+	})
+
+	return NewIntegrityError(errs)
 }
 
 //
@@ -115,14 +167,14 @@ func (c *FileCache) Get(key string) (value []byte, ttl time.Duration, err error)
 		return nil, 0, err
 	}
 
-	liveItem.ttl -= time.Since(c.lastTick)
-	if liveItem.ttl <= 0 {
+	liveItem.TTL -= time.Since(c.lastTick)
+	if liveItem.TTL <= 0 {
 		c.cache.Delete(liveItem)
 		liveItem.delete(c.dir)
 		return nil, 0, ErrItemNotFound
 	}
 
-	return value, liveItem.ttl, nil
+	return value, liveItem.TTL, nil
 }
 
 // Delete an item from the cache.
@@ -169,7 +221,7 @@ func (c *FileCache) Keys() []string {
 	var keys []string = make([]string, c.cache.Len())
 	var i int
 	c.cache.Traverse(func(item *item) {
-		keys[i] = item.key
+		keys[i] = item.Key
 		i++
 	})
 	return keys
@@ -189,20 +241,20 @@ func (c *FileCache) Len() int {
 func (c *FileCache) Has(key string) (ttl time.Duration, has bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var item *item = &item{key: key}
+	var item *item = &item{Key: key}
 	item, has = c.cache.Search(item)
 	if !has {
 		return 0, false
 	}
 
-	item.ttl -= time.Since(c.lastTick)
-	if item.ttl <= 0 {
+	item.TTL -= time.Since(c.lastTick)
+	if item.TTL <= 0 {
 		c.cache.Delete(item)
 		item.delete(c.dir)
 		return 0, false
 	}
 
-	return item.ttl, true
+	return item.TTL, true
 }
 
 func (c *FileCache) delete(item *item) (err error) {
@@ -263,8 +315,8 @@ func (c *FileCache) cleanup() {
 		if i == nil {
 			return true
 		}
-		i.ttl -= c.cleanupInterval
-		if i.ttl <= 0 {
+		i.TTL -= c.cleanupInterval
+		if i.TTL <= 0 {
 			err = c.delete(i)
 			if err != nil {
 				panic(err)
