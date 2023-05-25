@@ -15,8 +15,6 @@ services:
     ports:
       - "2392:2392"
     volumes:
-      - cache_data:/netcache/cache
+      - ./cache_data:/netcache/cache
       - ./log:/netcache/log
-volumes:
-  cache_data:
 

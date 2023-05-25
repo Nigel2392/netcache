@@ -13,6 +13,8 @@ import (
 	"github.com/Nigel2392/netcache/src/server"
 )
 
+const VERSION = "1.2.1"
+
 func main() {
 	setup()
 
@@ -92,6 +94,7 @@ func dumpFlags(logger logger.Logger) {
 	logger.Infof("  InitFile: %s\n", flags.initFile)
 	logger.Infof("  SavePeriod: %d\n", flags.savePeriod)
 	logger.Infof("  SaveOnInterrupt: %t\n", flags.saveOnInterrupt)
+	logger.Infof("  Version: %s\n", VERSION)
 }
 
 func startCLI() {
