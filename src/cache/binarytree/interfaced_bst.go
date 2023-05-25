@@ -1,5 +1,14 @@
 package binarytree
 
+/*
+
+Ported binarytree package from github.com/Nigel2392/go-datastructures/binarytree
+
+The original binarytree implementation did not have any exported fields,
+this means the cache could not properly save and load the binarytree.
+
+*/
+
 import (
 	"fmt"
 	"math"

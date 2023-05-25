@@ -79,6 +79,9 @@ func dumpFlags(logger logger.Logger) {
 	logger.Infof("  LogLevel: %s\n", flags.loglevel)
 	logger.Infof("  LogFile: %s\n", flags.logfile)
 	logger.Infof("  Memcache: %t\n\n", flags.memcache)
+	logger.Infof("  InitFile: %s\n", flags.initFile)
+	logger.Infof("  SavePeriod: %d\n", flags.savePeriod)
+	logger.Infof("  SaveOnInterrupt: %t\n", flags.saveOnInterrupt)
 }
 
 func startCLI() {
