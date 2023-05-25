@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -58,14 +59,11 @@ func (s *CacheServer) SavePeriodically(init_file string, interval time.Duration)
 		for range t.C {
 			err = s.Save(init_file)
 			if err != nil {
-				if s.logger != nil {
-					s.logger.Critical(fmt.Errorf("Error saving cache: %s\n", err))
-				}
 				errs++
 			}
 			if errs > 5 {
 				if s.logger != nil {
-					s.logger.Critical(fmt.Errorf("Too many errors saving cache, exiting."))
+					s.logger.Critical(errors.New("Too many errors saving cache, exiting."))
 				}
 				os.Exit(1)
 			}
@@ -92,17 +90,31 @@ func (s *CacheServer) Save(init_file string) error {
 	var b, err = s.Cache.Dump()
 	if err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error dumping cache: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error dumping cache: %s", err))
 		}
 		return err
 	}
 	if s.logger != nil {
 		s.logger.Debug("Writing cache...")
 	}
-	f, err := os.OpenFile(init_file, os.O_CREATE|os.O_RDWR, 0666)
+
+	var dir = filepath.Dir(init_file)
+	if _, err = os.Stat(dir); os.IsNotExist(err) {
+		if s.logger != nil {
+			s.logger.Debug("Creating directory...")
+		}
+		err = os.MkdirAll(dir, 0777)
+		if err != nil {
+			return err
+		}
+	}
+	var f *os.File
+	if f, err = os.OpenFile(init_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666); err != nil {
+		return err
+	}
 	if err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error opening init file: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error opening init file: %s", err))
 		}
 		return err
 	}
@@ -110,7 +122,7 @@ func (s *CacheServer) Save(init_file string) error {
 	_, err = f.Write(b)
 	if err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error writing init file: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error writing init file: %s", err))
 		}
 	}
 	return err
@@ -127,7 +139,7 @@ func (s *CacheServer) Load(init_file string) error {
 
 	if f, err = os.Open(init_file); err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error opening init file: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error opening init file: %s", err))
 		}
 		return err
 	}
@@ -135,7 +147,7 @@ func (s *CacheServer) Load(init_file string) error {
 	var b bytes.Buffer
 	if _, err = b.ReadFrom(f); err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error reading init file: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error reading init file: %s", err))
 		}
 		return err
 	}
@@ -147,7 +159,7 @@ func (s *CacheServer) Load(init_file string) error {
 	err = s.Cache.Load(b.Bytes())
 	if err != nil {
 		if s.logger != nil {
-			s.logger.Critical(fmt.Errorf("Error loading cache: %s\n", err))
+			s.logger.Critical(fmt.Errorf("Error loading cache: %s", err))
 		}
 		return err
 	}

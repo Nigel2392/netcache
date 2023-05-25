@@ -32,8 +32,11 @@ func main() {
 		c = cache.NewFileCache(flags.cacheDir)
 	}
 
+	var shouldLoad bool
 	if flags.initFile == "" {
 		flags.initFile = fmt.Sprintf("%s/init.netcache", flags.cacheDir)
+	} else {
+		shouldLoad = true
 	}
 
 	var savePeriod time.Duration
@@ -55,6 +58,13 @@ func main() {
 	)
 
 	dumpFlags(logger)
+
+	if shouldLoad {
+		err = server.Load(flags.initFile)
+		if err != nil {
+			logger.Error(err)
+		}
+	}
 
 	if flags.saveOnInterrupt {
 		server.SaveOnInterrupt(flags.initFile)
@@ -78,7 +88,7 @@ func dumpFlags(logger logger.Logger) {
 	logger.Infof("  Timeout: %d\n", flags.timeout)
 	logger.Infof("  LogLevel: %s\n", flags.loglevel)
 	logger.Infof("  LogFile: %s\n", flags.logfile)
-	logger.Infof("  Memcache: %t\n\n", flags.memcache)
+	logger.Infof("  Memcache: %t\n", flags.memcache)
 	logger.Infof("  InitFile: %s\n", flags.initFile)
 	logger.Infof("  SavePeriod: %d\n", flags.savePeriod)
 	logger.Infof("  SaveOnInterrupt: %t\n", flags.saveOnInterrupt)
@@ -88,7 +98,8 @@ func startCLI() {
 	var client = client.New(fmt.Sprintf("%s:%d", flags.address, flags.port), nil, time.Duration(flags.timeout)*time.Second, 10)
 	var err = client.Connect()
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 	var cmd string
 	printHelp()

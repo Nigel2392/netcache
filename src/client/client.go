@@ -197,8 +197,6 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 		return err
 	}
 
-	fmt.Println("value", value)
-
 	var v []byte
 	var err error
 	if c.Serializer == nil {
@@ -227,8 +225,6 @@ func (c *CacheClient) Set(key string, value any, ttl time.Duration) error {
 	}
 
 	var conn = c.pool.get(c.timeout)
-	fmt.Println("conn", conn)
-
 	defer c.pool.put(conn)
 	_, err = message.WriteTo(conn)
 	if err != nil {
