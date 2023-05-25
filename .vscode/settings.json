@@ -2,5 +2,5 @@
     //  "go.buildFlags": [
     //      "-tags", "docker"
     //  ],
-    "workbench.colorTheme": "2077"
+    "workbench.colorTheme": "One Dark Modern"
 }
